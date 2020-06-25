@@ -44,7 +44,7 @@ async fn insert(pool: SqlitePool){
     let mut ctr:i32 = 0;
     loop{
         ctr = ctr % 3;
-        let mut data = vec![0u8; 1024 * 1024];
+        let mut data = vec![0u8; 4096];
         thread_rng().try_fill(&mut *data).unwrap();
         let title = ctr.to_string();
         let result = sqlx::query("INSERT INTO data VALUES (?, ?)")
