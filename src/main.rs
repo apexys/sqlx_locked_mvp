@@ -21,25 +21,30 @@ async fn main() {
     query("CREATE TABLE IF NOT EXISTS data (source TEXT, data BLOB)").execute(&pool).await.unwrap();
     query("CREATE INDEX IF NOT EXISTS data_index on data(source)").execute(&pool).await.unwrap();
 
+    //Pragmas for the parallelism
+    query("PRAGMA journal_mode=WAL").execute(&pool).await.unwrap();
+    query("PRAGMA busy_timeout=60000").execute(&pool).await.unwrap();
+
     //start process for inserts
     for i in 0 .. 2{
         let insert_pool = pool.clone();
-        tokio::spawn(async {timeout(Duration::from_secs(10), async{insert(insert_pool).await}).await});
+        tokio::spawn(async {timeout(Duration::from_secs(20), async{insert(insert_pool).await}).await});
     }
 
     //start process for requests
     for i in 0 .. 2{
         let insert_pool = pool.clone();
-        tokio::spawn(async {timeout(Duration::from_secs(10), async{request(insert_pool).await}).await});
+        tokio::spawn(async {timeout(Duration::from_secs(20), async{request(insert_pool).await}).await});
     }
 
-    delay_for(Duration::from_secs(10)).await;
+    delay_for(Duration::from_secs(20)).await;
 }
 
 async fn insert(pool: SqlitePool){
     let mut ctr:i32 = 0;
     loop{
-        let mut data = vec![0u8; 4096];
+        ctr = ctr % 3;
+        let mut data = vec![0u8; 1024 * 1024];
         thread_rng().try_fill(&mut *data).unwrap();
         let title = ctr.to_string();
         let result = sqlx::query("INSERT INTO data VALUES (?, ?)")
@@ -48,8 +53,8 @@ async fn insert(pool: SqlitePool){
         .execute(&pool)
         .await;
         match result {
-            Ok(_) => eprintln!("Inserting packet {}: OK", &title),
-            Err(e) => eprintln!("Inserting packet {}: Err({:?})", &title, e)
+            Ok(_) => println!("Inserting packet {}: OK", &title),
+            Err(e) => println!("Inserting packet {}: Err({:?})", &title, e)
         }
         delay_for(Duration::from_millis(10)).await;
         ctr += 1;
@@ -59,15 +64,16 @@ async fn insert(pool: SqlitePool){
 async fn request(pool: SqlitePool){
     let mut ctr:i32 = 0;
     loop{
+        ctr = ctr % 3;
         let title = ctr.to_string();
         let mut cursor = sqlx::query("SELECT data FROM data WHERE source = ?")
         .bind(&title)
         .fetch(&pool);
 
         match cursor.next().await{
-            Some(Ok(row)) => {let data: &[u8] = row.get("data"); eprintln!("Fetching {} OK, got {} bytes", &title, data.len())},
-            Some(Err(err)) => eprintln!("Fetching {} failed, got error {:?}", &title, err),
-            None => eprintln!("Fetching {} returned None", &title)
+            Some(Ok(row)) => {let data: &[u8] = row.get("data"); println!("Fetching {} OK, got {} bytes", &title, data.len())},
+            Some(Err(err)) => println!("Fetching {} failed, got error {:?}", &title, err),
+            None => println!("Fetching {} returned None", &title)
         }
         delay_for(Duration::from_millis(10)).await;
         ctr += 1;
