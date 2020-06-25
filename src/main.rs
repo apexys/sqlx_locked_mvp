@@ -16,12 +16,8 @@ async fn main() {
         std::fs::remove_file("cache.db");
     }
     println!("Creating database");
-    let pool = SqlitePool::builder().max_size(num_cpus::get() as u32).build("sqlite:cache.db").await.unwrap();
-    //Enable WAL mode
-    query("PRAGMA journal_size_limit=10000000").execute(&pool).await.unwrap();
-    query("PRAGMA soft_heap_limit=1000000000").execute(&pool).await.unwrap();
-    
-    //Table for the geodata tile cache
+    let pool = SqlitePool::builder().max_size(num_cpus::get() as u32).build("sqlite:cache.db").await.unwrap();    
+    //Table for the cache
     query("CREATE TABLE IF NOT EXISTS data (source TEXT, data BLOB)").execute(&pool).await.unwrap();
     query("CREATE INDEX IF NOT EXISTS data_index on data(source)").execute(&pool).await.unwrap();
 
@@ -53,7 +49,7 @@ async fn insert(pool: SqlitePool){
         .await;
         match result {
             Ok(_) => eprintln!("Inserting packet {}: OK", &title),
-            Err(e) => eprintln!("Inserting packet {}: OErr({:?})", &title, e)
+            Err(e) => eprintln!("Inserting packet {}: Err({:?})", &title, e)
         }
         delay_for(Duration::from_millis(10)).await;
         ctr += 1;
