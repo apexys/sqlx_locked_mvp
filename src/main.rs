@@ -25,9 +25,15 @@ async fn main() {
     query("PRAGMA journal_mode=WAL").execute(&pool).await.unwrap();
     query("PRAGMA busy_timeout=60000").execute(&pool).await.unwrap();
 
+
+    let writer_pool = SqlitePool::builder().max_size(num_cpus::get() as u32).build("sqlite:cache.db").await.unwrap();    
+    query("PRAGMA journal_mode=WAL").execute(&writer_pool).await.unwrap();
+    query("PRAGMA busy_timeout=60000").execute(&writer_pool).await.unwrap();
+
+
     //start process for inserts
     for i in 0 .. 2{
-        let insert_pool = pool.clone();
+        let insert_pool = writer_pool.clone();
         tokio::spawn(async {timeout(Duration::from_secs(20), async{insert(insert_pool).await}).await});
     }
 
